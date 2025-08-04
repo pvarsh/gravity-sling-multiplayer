@@ -9,15 +9,17 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
+	// TODO: restrict origins in production
 	CheckOrigin: func(r *http.Request) bool {
 		return true // Allow all origins for dev
 	},
 }
 
 func main() {
-	http.HandleFunc("/", helloHandler)
+	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/ws", wsHandler)
 	log.Println("Starting server on :8080")
+	// TODO server with graceful shutdown
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Could not start server: %s\n", err)
 	}
@@ -46,6 +48,33 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello, World! Let's make a %s game", r.URL.Path[1:])
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, `
+	<!DOCTYPE html>
+	<html>
+	<head>
+		<title>Gravity Sling</title>
+	</head>
+	<body>
+		<h1>Welcome to Gravity Sling Multiplayer!</h1>
+	<input id="msg" type="text" placeholder="Type a message and press Enter" autofocus />
+	<pre id="log"></pre>
+	<script>
+		const ws = new WebSocket("ws://" + location.host + "/ws");
+		const log = document.getElementById("log");
+		ws.onopen = () => log.textContent += "WebSocket connected!\n";
+		ws.onerror = (err) => log.textContent += "WebSocket error: " + err.message + "\n";
+		ws.onclose = () => log.textContent += "WebSocket connection closed\n";
+		ws.onmessage = (event) => log.textContent += event.data + "\n";
+		document.getElementById("msg").addEventListener("keydown", (event) => {
+			if (event.key === "Enter" && event.target.value) {
+				console.log("Sending message:", event.target.value);
+				ws.send(event.target.value);
+				event.target.value = "";
+			}
+		});
+	</script>
+	</body>
+	</html>
+	`)
 }
